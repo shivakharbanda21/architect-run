@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Creature Lab</title>
+<style>
+  :root { --pill: rgba(28, 34, 50, .80); --accent: #8b6cff; --mint: #5fe0a6; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #d6e6f3;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #fff;
+    touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  .pill { background: var(--pill); border-radius: 999px; padding: 8px 14px; font-weight: 800;
+    font-size: 13px; letter-spacing: .04em; display: inline-flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  #top { position: fixed; top: 12px; left: 12px; pointer-events: none; display: flex; gap: 8px; }
+  #muteBtn { pointer-events: auto; border: 0; color: #fff; cursor: pointer; font: inherit; font-size: 13px; font-weight: 800; }
+  #tags { position: fixed; inset: 0; pointer-events: none; }
+  .tag { position: absolute; transform: translate(-50%, -100%); padding: 4px 10px; font-size: 12px; white-space: nowrap; }
+  .tag.me { outline: 2px solid var(--accent); }
+  .tag small { opacity: .6; font-weight: 700; }
+
+  #playBtn { position: fixed; top: 12px; right: 150px; color: #fff; text-decoration: none; background: #3fbf6a; }
+  #panelBtn { position: fixed; top: 12px; right: 12px; border: 0; color: #fff; cursor: pointer; font: inherit; }
+  #panel { position: fixed; top: 58px; right: 12px; width: 270px; max-height: calc(100vh - 80px); overflow: auto;
+    background: var(--pill); border-radius: 18px; padding: 14px; font-size: 13px; box-sizing: border-box; }
+  #panel.hidden { display: none; }
+  #cname { font-size: 22px; font-weight: 900; letter-spacing: .03em; }
+  #cseed { opacity: .7; font-size: 12px; margin-bottom: 10px; }
+  .row { display: flex; gap: 6px; margin: 8px 0; align-items: center; }
+  .row label { width: 70px; opacity: .85; }
+  .row input[type=range] { flex: 1; accent-color: var(--accent); }
+  button.b { background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 8px 10px;
+    font: inherit; font-weight: 800; cursor: pointer; }
+  button.b.alt { background: rgba(255,255,255,.14); }
+  input.seed { flex: 1; min-width: 0; background: rgba(255,255,255,.12); color: #fff; border: 0; border-radius: 8px;
+    padding: 7px 8px; font: inherit; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+  .chip { background: rgba(255,255,255,.12); border-radius: 999px; padding: 6px 10px; cursor: pointer; font-weight: 700; font-size: 12px; }
+  .chip.on { background: var(--mint); color: #12301f; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 6px 0; }
+  .grid3 span { text-align: center; background: rgba(255,255,255,.12); border-radius: 8px; padding: 7px 0; cursor: pointer; font-weight: 800; font-size: 12px; }
+  .grid3 span.on { background: var(--accent); }
+  h4 { margin: 12px 0 4px; font-size: 11px; letter-spacing: .12em; opacity: .7; }
+
+  #help { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); pointer-events: none; font-weight: 700; max-width: 92vw; }
+  #touch { display: none; }
+  .coarse #touch { display: block; }
+  .coarse #help { display: none; }
+  #joy { position: fixed; left: 24px; bottom: 28px; width: 130px; height: 130px; border-radius: 50%;
+    background: rgba(28,34,50,.35); border: 2px solid rgba(255,255,255,.4); }
+  #knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
+    background: rgba(255,255,255,.85); }
+  .tbtn { position: fixed; border-radius: 50%; background: var(--pill); border: 2px solid rgba(255,255,255,.4);
+    color: #fff; font-weight: 900; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  #tJump { right: 28px; bottom: 40px; width: 84px; height: 84px; font-size: 15px; }
+  #tWave { right: 124px; bottom: 30px; width: 58px; height: 58px; }
+  #tFlop { right: 40px; bottom: 140px; width: 58px; height: 58px; }
+  #err { position: fixed; inset: 20px; background: #300; color: #fcc; padding: 16px; font: 12px monospace; white-space: pre-wrap; display: none; overflow: auto; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="tags"></div>
+<div id="top"><span class="pill"><span class="dot" style="background:#ff9a3c"></span>CREATURE LAB</span>
+  <button id="muteBtn" class="pill">🔊 SOUND</button></div>
+
+<a id="playBtn" class="pill" href="index.html">▶ PLAY</a>
+<button id="panelBtn" class="pill">CREATURE ▾</button>
+<div id="panel">
+  <div id="cname">—</div>
+  <div id="cseed">seed —</div>
+  <div class="row"><button class="b" id="bNew" style="flex:1">🎲 New creature</button></div>
+  <div class="row">
+    <input class="seed" id="iSeed" inputmode="numeric" placeholder="seed">
+    <button class="b alt" id="bLoad">Load</button>
+    <button class="b alt" id="bCopy">Copy</button>
+  </div>
+  <h4>BODY PLAN</h4>
+  <div class="grid3" id="plans"></div>
+  <h4>LOOK</h4>
+  <div class="row"><label>Color</label><input type="range" id="sHue" min="0" max="360"></div>
+  <div class="row"><label>Size</label><input type="range" id="sSize" min="75" max="135"></div>
+  <div class="row"><label>Body</label><input type="range" id="sBody" min="75" max="135"></div>
+  <div class="row"><label>Legs</label><input type="range" id="sLeg" min="70" max="140"></div>
+  <div class="row"><label>Eyes</label><input type="range" id="sEyes" min="1" max="9"></div>
+  <div class="row"><label>Eye size</label><input type="range" id="sEye" min="70" max="140"></div>
+  <h4>PARTS</h4>
+  <div class="chips" id="chips"></div>
+  <h4>CROWD</h4>
+  <div class="row"><button class="b alt" id="bCrowd" style="flex:1">Reroll crowd</button></div>
+</div>
+
+<div id="help" class="pill">WASD / arrows move · Space jump · E wave · K flop · M mute · drag to orbit · scroll to zoom</div>
+<div id="touch">
+  <div id="joy"><div id="knob"></div></div>
+  <div class="tbtn" id="tJump">JUMP</div>
+  <div class="tbtn" id="tWave">WAVE</div>
+  <div class="tbtn" id="tFlop">FLOP</div>
+</div>
+<div id="err"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { setup, SUN, canvasTex, V3, clamp, damp, rand, css, PLANS, PLAN_LABEL, PARTS, genSpec, VP, Sfx, Creature } from './src/engine.js';
+
+const errBox = document.getElementById('err');
+addEventListener('error', e => { errBox.style.display = 'block'; errBox.textContent += (e.message || e) + '\n'; });
+
+// ---------- renderer / scene ----------
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#d6e6f3');
+scene.fog = new THREE.Fog('#d6e6f3', 30, 75);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+scene.add(new THREE.HemisphereLight('#ffffff', '#9fb4c8', 1.9));
+const sun = new THREE.DirectionalLight('#ffffff', 2.0);
+sun.position.copy(SUN).multiplyScalar(30); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -22, right: 22, top: 22, bottom: -22, far: 80 });
+sun.shadow.bias = -0.0005; scene.add(sun);
+
+
+const ARENA = 13;
+setup({ scene, camera, world: { groundY: () => 0, clamp: p => { const r = Math.hypot(p.x, p.z), lim = ARENA - 1; if (r > lim) { p.x *= lim / r; p.z *= lim / r; } } } });
+const checker = canvasTex(128, 128, (g, w) => { g.fillStyle = '#e6eef5'; g.fillRect(0, 0, w, w);
+  g.fillStyle = '#cfdbe6'; g.fillRect(0, 0, w / 2, w / 2); g.fillRect(w / 2, w / 2, w / 2, w / 2);
+  g.strokeStyle = 'rgba(120,140,165,.35)'; g.lineWidth = 2; g.strokeRect(0, 0, w, w); g.strokeRect(0, 0, w / 2, w / 2); g.strokeRect(w / 2, w / 2, w / 2, w / 2); });
+checker.wrapS = checker.wrapT = THREE.RepeatWrapping; checker.repeat.set(ARENA / 2, ARENA / 2); checker.anisotropy = 8;
+const disk = new THREE.Mesh(new THREE.CylinderGeometry(ARENA, ARENA - 0.4, 0.8, 72),
+  [new THREE.MeshStandardMaterial({ color: '#a9c6e0', roughness: .5 }), new THREE.MeshStandardMaterial({ map: checker, roughness: .8 }),
+   new THREE.MeshStandardMaterial({ color: '#a9c6e0' })]);
+disk.position.y = -0.4; disk.receiveShadow = true; scene.add(disk);
+const cloudMat = new THREE.MeshStandardMaterial({ color: '#f1f5f9', roughness: 1 });
+const sphere = new THREE.SphereGeometry(1, 24, 16);
+for (let i = 0; i < 46; i++) { const a = rand(0, Math.PI * 2), rr = rand(ARENA + 2, 34);
+  const m = new THREE.Mesh(sphere, cloudMat); const s = rand(1.6, 4.5);
+  m.scale.set(s * rand(1, 1.6), s * .7, s); m.position.set(Math.cos(a) * rr, rand(-4, -1.2), Math.sin(a) * rr); scene.add(m); }
+const iceMat = new THREE.MeshStandardMaterial({ color: '#a8cdee', roughness: .25, flatShading: true });
+for (let i = 0; i < 34; i++) { const a = rand(0, Math.PI * 2), rr = rand(ARENA + 1, 28);
+  const h = rand(1.5, 5.5); const m = new THREE.Mesh(new THREE.ConeGeometry(rand(.35, .8), h, 5), iceMat);
+  m.position.set(Math.cos(a) * rr, h / 2 - rand(.5, 2), Math.sin(a) * rr); m.rotation.set(rand(-.25, .25), rand(0, 6), rand(-.25, .25));
+  m.castShadow = true; scene.add(m); }
+const rockMat = new THREE.MeshStandardMaterial({ color: '#b7c6d6', roughness: .7, flatShading: true });
+const rocks = [];
+for (let i = 0; i < 12; i++) { const a = rand(0, Math.PI * 2), rr = rand(ARENA + 4, 30);
+  const m = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(.8, 2), 0), rockMat);
+  m.position.set(Math.cos(a) * rr, rand(3, 9), Math.sin(a) * rr); m.userData.spin = rand(-.3, .3); scene.add(m); rocks.push(m); }
+
+// ---------- world population ----------
+const randSeed = () => Math.floor(Math.random() * 2147483647);
+const hs = new URLSearchParams(location.hash.slice(1));
+const hSeed = parseInt(hs.get('seed')), hPlan = PLANS.includes(hs.get('plan')) ? hs.get('plan') : null;
+const player = new Creature(genSpec(Number.isFinite(hSeed) ? hSeed : randSeed(), hPlan), 0, 0, true);
+player.yaw = Math.PI;
+let npcs = [];
+function spawnCrowd() {
+  npcs.forEach(n => n.dispose()); npcs = [];
+  const order = [...PLANS].sort(() => Math.random() - .5);
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + .3, rr = rand(5, 9);
+    npcs.push(new Creature(genSpec(randSeed(), order[i]), Math.cos(a) * rr, Math.sin(a) * rr)); }
+}
+spawnCrowd();
+
+// ---------- input ----------
+const keys = new Set();
+// only the seed text box keeps the keyboard; sliders/buttons hand it straight back to the game
+const typing = el => el && el.tagName === 'INPUT' && el.type !== 'range';
+addEventListener('keydown', e => {
+  if (typing(e.target)) return;
+  if (e.target !== document.body && e.target.blur) e.target.blur();
+  if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+  keys.add(e.code);
+  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) player.jumpReq = true; }
+  if (e.code === 'KeyE' && !e.repeat) player.wave();
+  if (e.code === 'KeyK' && !e.repeat) player.flop();
+  if (e.code === 'KeyM' && !e.repeat) setMute(Sfx.toggle());
+});
+// audio can only start from a user gesture
+addEventListener('pointerdown', Sfx.unlock, true); addEventListener('keydown', Sfx.unlock, true);
+const muteBtn = document.getElementById('muteBtn');
+function setMute(m) { muteBtn.textContent = m ? '🔇 MUTED' : '🔊 SOUND'; }
+setMute(Sfx.muted);
+muteBtn.onclick = () => { Sfx.unlock(); setMute(Sfx.toggle()); };
+addEventListener('keyup', e => keys.delete(e.code));
+addEventListener('blur', () => keys.clear());
+
+const cam = { yaw: Math.PI * .12, pitch: .34, dist: 9, target: new V3(0, 1, 0) };
+let drag = null;
+canvas.addEventListener('pointerdown', e => { document.activeElement?.blur?.(); drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+// after using any panel control, give the keyboard back to the game
+document.getElementById('panel').addEventListener('change', e => { if (!typing(e.target)) e.target.blur(); });
+document.getElementById('panel').addEventListener('pointerup', e => { if (!typing(e.target)) setTimeout(() => { if (!typing(document.activeElement)) document.activeElement?.blur?.(); }, 0); });
+canvas.addEventListener('pointermove', e => { if (!drag || drag.id !== e.pointerId) return;
+  cam.yaw -= (e.clientX - drag.x) * .006; cam.pitch = clamp(cam.pitch + (e.clientY - drag.y) * .004, .08, 1.25);
+  drag.x = e.clientX; drag.y = e.clientY; });
+canvas.addEventListener('pointerup', () => drag = null);
+canvas.addEventListener('pointercancel', () => drag = null);
+canvas.addEventListener('wheel', e => { cam.dist = clamp(cam.dist + e.deltaY * .01, 3.5, 18); e.preventDefault(); }, { passive: false });
+
+if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('coarse');
+const joy = document.getElementById('joy'), knob = document.getElementById('knob'); const stick = { x: 0, y: 0, id: null };
+joy.addEventListener('pointerdown', e => { stick.id = e.pointerId; joy.setPointerCapture(e.pointerId); moveStick(e); });
+joy.addEventListener('pointermove', e => { if (e.pointerId === stick.id) moveStick(e); });
+const endStick = () => { stick.id = null; stick.x = stick.y = 0; knob.style.transform = ''; };
+joy.addEventListener('pointerup', endStick); joy.addEventListener('pointercancel', endStick);
+function moveStick(e) { const b = joy.getBoundingClientRect(); let dx = e.clientX - (b.left + b.width / 2), dy = e.clientY - (b.top + b.height / 2);
+  const m = Math.hypot(dx, dy), max = b.width / 2 - 10; if (m > max) { dx *= max / m; dy *= max / m; }
+  stick.x = dx / max; stick.y = dy / max; knob.style.transform = `translate(${dx}px,${dy}px)`; }
+const tap = (id, fn) => document.getElementById(id).addEventListener('pointerdown', e => { e.preventDefault(); fn(); });
+tap('tJump', () => player.jumpReq = true); tap('tWave', () => player.wave()); tap('tFlop', () => player.flop());
+
+// ---------- panel ----------
+const $ = id => document.getElementById(id);
+const panel = $('panel');
+if (innerWidth < 700) panel.classList.add('hidden');
+$('panelBtn').onclick = () => panel.classList.toggle('hidden');
+$('plans').innerHTML = PLANS.map(p => `<span data-plan="${p}">${PLAN_LABEL[p]}</span>`).join('');
+function syncPanel() {
+  const s = player.spec;
+  $('cname').textContent = s.name; $('cname').style.color = css(player.col.acc); $('cseed').textContent = `seed ${s.seed} · ${PLAN_LABEL[s.plan]}`;
+  $('iSeed').value = s.seed; $('sHue').value = Math.round(s.hue * 360); $('sSize').value = Math.round(s.size * 100);
+  $('sBody').value = Math.round(s.body * 100); $('sLeg').value = Math.round(s.leg * 100);
+  $('sEyes').value = s.eyes; $('sEye').value = Math.round(s.eyeSize * 100);
+  document.querySelectorAll('#plans span').forEach(el => el.classList.toggle('on', el.dataset.plan === s.plan));
+  $('chips').innerHTML = PARTS.map(p => `<span class="chip ${s.parts.includes(p) ? 'on' : ''}" data-p="${p}">${p}</span>`).join('');
+  history.replaceState(null, '', `#seed=${s.seed}&plan=${s.plan}`);
+  try { localStorage.setItem('ag.creature', JSON.stringify(s)); } catch {}
+}
+function edit(fn) { const s = { ...player.spec, parts: [...player.spec.parts] }; fn(s); player.setSpec(s); syncPanel(); }
+$('bNew').onclick = () => { player.setSpec(genSpec(randSeed())); Sfx.sparkle(); player.wave(); syncPanel(); };
+$('panel').addEventListener('click', e => { if (e.target.closest('.chip, .grid3 span, #bLoad, #bCopy')) Sfx.click(); });
+$('bLoad').onclick = () => { const v = parseInt($('iSeed').value); if (Number.isFinite(v)) { player.setSpec(genSpec(v)); syncPanel(); } };
+$('bCopy').onclick = () => navigator.clipboard?.writeText(location.href);
+$('plans').onclick = e => { const p = e.target.dataset.plan; if (p) { player.setSpec(genSpec(player.spec.seed, p)); syncPanel(); } };
+$('sHue').oninput = e => edit(s => s.hue = e.target.value / 360);
+$('sSize').oninput = e => edit(s => s.size = e.target.value / 100);
+$('sBody').oninput = e => edit(s => s.body = e.target.value / 100);
+$('sLeg').oninput = e => edit(s => s.leg = e.target.value / 100);
+$('sEyes').oninput = e => edit(s => s.eyes = +e.target.value);
+$('sEye').oninput = e => edit(s => s.eyeSize = e.target.value / 100);
+$('chips').onclick = e => { const p = e.target.dataset.p; if (!p) return;
+  edit(s => { s.parts = s.parts.includes(p) ? s.parts.filter(x => x !== p) : [...s.parts, p]; }); };
+$('bCrowd').onclick = () => { spawnCrowd(); Sfx.sparkle(); };
+syncPanel();
+
+// ---------- loop ----------
+function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+
+const clock = new THREE.Clock(); let time = 0;
+function npcThink(n, dt) {
+  const a = n.ai; a.wait -= dt;
+  const d = a.target.clone().sub(n.pos); d.y = 0;
+  if (a.wait > 0 || d.length() < .5) {
+    if (a.wait <= 0) { a.wait = rand(.6, 2.5); const ang = rand(0, 6.28), rr = rand(0, 3.5);
+      a.target.set(a.home.x + Math.cos(ang) * rr, 0, a.home.z + Math.sin(ang) * rr);
+      if (Math.random() < .2) n.jumpReq = true; if (Math.random() < .06) n.wave(); }
+    return new V3();
+  }
+  return d.normalize().multiplyScalar(.5);
+}
+function separate(list) {
+  for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+    const a = list[i], b = list[j], dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z, d = Math.hypot(dx, dz), m = a.rad + b.rad;
+    if (d > 0 && d < m) { const push = (m - d) / 2 / d;
+      const closing = ((a.vel.x - b.vel.x) * dx + (a.vel.z - b.vel.z) * dz) / d;
+      if (closing > 1.2) Sfx.bump(a, b); a.pos.x -= dx * push; a.pos.z -= dz * push; b.pos.x += dx * push; b.pos.z += dz * push; }
+  }
+}
+function frame() {
+  const dt = Math.min(clock.getDelta(), 1 / 30); time += dt;
+  const fwd = new V3(Math.sin(cam.yaw), 0, Math.cos(cam.yaw)), right = new V3(-fwd.z, 0, fwd.x);
+  const ix = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + stick.x;
+  const iz = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) - stick.y;
+  const wish = right.multiplyScalar(ix).addScaledVector(fwd, iz); if (wish.length() > 1) wish.normalize();
+
+  cam.target.x = damp(cam.target.x, player.pos.x, 8, dt); cam.target.z = damp(cam.target.z, player.pos.z, 8, dt);
+  cam.target.y = damp(cam.target.y, player.mid, 6, dt);
+  const look = new V3(Math.sin(cam.yaw) * Math.cos(cam.pitch), -Math.sin(cam.pitch), Math.cos(cam.yaw) * Math.cos(cam.pitch));
+  camera.position.copy(cam.target).addScaledVector(look, -cam.dist); camera.lookAt(cam.target);
+  camera.updateMatrixWorld();
+
+  player.update(dt, wish, time);
+  for (const n of npcs) n.update(dt, npcThink(n, dt), time);
+  separate([player, ...npcs]);
+  for (const r of rocks) r.rotation.y += r.userData.spin * dt;
+
+  VP.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  renderer.render(scene, camera);
+
+  for (const c of [player, ...npcs]) {
+    const p = c.head.clone().project(camera);
+    const vis = p.z < 1 && Math.abs(p.x) < 1.1 && Math.abs(p.y) < 1.1;
+    c.tag.style.display = vis ? '' : 'none';
+    if (vis) { c.tag.style.left = ((p.x + 1) / 2 * innerWidth) + 'px'; c.tag.style.top = ((1 - p.y) / 2 * innerHeight) + 'px'; }
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.lab = { player, get npcs() { return npcs; }, genSpec, cam, PLANS, Sfx };
+</script>
+</body>
+</html>
